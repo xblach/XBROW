@@ -245,6 +245,10 @@
     color:var(--off);background:rgba(226,58,46,0.1);border:1px solid var(--red-dim);border-radius:100px;
     padding:2px 8px;margin:2px 4px 0 0;
   }
+  .ergo-entry{
+    margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--line);
+  }
+  .ergo-entry:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
 
   /* ---- edit toggle button ---- */
   .edit-toggle-btn{
@@ -905,7 +909,7 @@ function blockRow(label, iconKey, content){
       const item = ergoItem(id);
       if(!item) return '';
       const linkBtn = item.link ? `<a class="block-link" href="${item.link}" target="_blank">${ICONS.x}Ver</a>` : '';
-      return `<div style="margin-bottom:4px;"><span class="fisico-chip">${item.name}</span>${linkBtn}</div>`;
+      return `<div class="ergo-entry">${item.name}${linkBtn}</div>`;
     }).join('');
     return `<div class="block"><div class="block-label">${ICONS.ergo}${label}</div><div class="block-body">${chips}</div></div>`;
   }
