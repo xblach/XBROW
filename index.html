@@ -609,6 +609,10 @@
 </section>
 
 <section id="viewRegatas" style="display:none;">
+  <nav class="teams" style="margin-bottom:18px;">
+    <button class="team-tab" data-team="rem" data-slug="rem-de-mar">REM DE MAR</button>
+    <button class="team-tab active" data-team="banco" data-slug="banco-fijo">BANCO FIJO</button>
+  </nav>
   <div class="regatas-head">
     <div>
       <div class="eyebrow" style="color:var(--red);" id="regatasEyebrow">Temporada 2026 — 2027</div>
@@ -1590,9 +1594,9 @@ const teamTabs = document.querySelectorAll('.team-tab');
 const subTeamsNav = document.getElementById('subTeams');
 teamTabs.forEach(btn => {
   btn.addEventListener('click', async () => {
-    teamTabs.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    subTeamsNav.style.display = (btn.dataset.team === 'rem') ? 'none' : 'flex';
+    const slug = btn.dataset.slug;
+    teamTabs.forEach(b => b.classList.toggle('active', b.dataset.slug === slug));
+    subTeamsNav.style.display = (slug === 'rem-de-mar') ? 'none' : 'flex';
     await switchCategory();
   });
 });
