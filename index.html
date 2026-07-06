@@ -131,7 +131,7 @@
     text-transform:uppercase;color:var(--mute-dim);margin-bottom:5px;
   }
   .block-label svg{width:11px;height:11px;opacity:0.8;}
-  .block-body{font-size:12.5px;line-height:1.42;color:var(--off);}
+  .block-body{font-size:12.5px;line-height:1.42;color:var(--off);white-space:pre-line;}
   .block-body.empty{color:var(--mute-dim);font-style:italic;}
   .block-link{
     display:inline-flex;align-items:center;gap:4px;margin-top:6px;
@@ -505,10 +505,16 @@
     .print-day{break-inside:avoid;border-bottom:1px solid #ddd;padding:10px 0;}
     .print-day h3{font-family:'Oswald',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 6px;}
     .print-day h3 .pdate{color:#888;font-weight:400;font-family:'JetBrains Mono',monospace;font-size:10px;margin-left:6px;}
-    .print-block{font-size:11.5px;margin:3px 0;}
+    .print-block{font-size:11.5px;margin:3px 0;white-space:pre-line;}
     .print-block b{font-family:'Oswald',sans-serif;font-size:9.5px;text-transform:uppercase;letter-spacing:0.04em;color:#B8281F;margin-right:6px;}
     .print-day a{color:#B8281F;text-decoration:underline;}
     .print-rest{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#999;font-style:italic;}
+    .print-fisico-section{margin-top:6px;}
+    .print-fisico-table{break-inside:avoid;margin-top:14px;padding-top:8px;border-top:1px solid #ddd;}
+    .print-fisico-table h4{font-family:'Oswald',sans-serif;font-size:12.5px;margin:0 0 6px;color:#B8281F;text-transform:uppercase;letter-spacing:0.03em;}
+    .print-ex-row{font-size:11px;padding:4px 0;border-bottom:1px dotted #ddd;}
+    .print-ex-name{font-weight:600;margin-right:8px;}
+    .print-ex-detail{color:#555;}
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1080,7 +1086,7 @@ function renderEditorGrid(){
 function exportPDF(){
   if(!currentWeek){ alert('No hay ninguna semana cargada para exportar.'); return; }
   const logoSrc = document.querySelector('.brand img').src;
-  const siteUrl = 'https://xbrow.vercel.app'; // placeholder hasta tener dominio propio
+  const siteUrl = 'https://xbrow.vercel.app'; // URL real ya publicada
   const label = currentLabel();
 
   const daysHtml = currentWeek.days.map((day, i) => {
@@ -1100,12 +1106,37 @@ function exportPDF(){
     return `<div class="print-day"><h3>${DAYS[i]} <span class="pdate">${day.d} ${monthLabel}</span></h3>${parts.join('')}</div>`;
   }).join('');
 
+  // Tablas de Físico usadas esta semana (una sola vez cada una, aunque se repita en varios días)
+  const usedFisicoIds = [...new Set(currentWeek.days.flatMap(d => d.blocks.fisico))];
+  let fisicoDetailHtml = '';
+  if(usedFisicoIds.length){
+    const tablesHtml = usedFisicoIds.map(id => {
+      const t = findFisicoTable(id);
+      if(!t) return '';
+      const exRows = (t.exercises.length === 0)
+        ? `<div class="print-ex-row"><span class="print-ex-name">Sin ejercicios asignados</span></div>`
+        : t.exercises.map(ex => {
+            const unit = ex.mode === 'time' ? 'seg' : 'reps';
+            return `<div class="print-ex-row">
+              <span class="print-ex-name">${ex.name}</span>
+              <span class="print-ex-detail">${ex.series} series × ${ex.value} ${unit} &middot; desc. series ${ex.restSeries}s &middot; desc. después ${ex.restAfter}s</span>
+            </div>`;
+          }).join('');
+      return `<div class="print-fisico-table"><h4>${t.name}</h4>${exRows}</div>`;
+    }).join('');
+    fisicoDetailHtml = `<div class="print-fisico-section">
+      <div class="print-title" style="font-size:15px;margin-top:22px;">Ejercicios de Físico de esta semana</div>
+      ${tablesHtml}
+    </div>`;
+  }
+
   document.getElementById('printArea').innerHTML = `
     <div class="print-header"><img src="${logoSrc}" alt="XBROW"><div class="pbrand">X<span>BROW</span></div></div>
     <div class="print-site-link">Consulta siempre la versión actualizada en <a href="${siteUrl}" target="_blank">${siteUrl}</a></div>
     <div class="print-title">Entrenos semanales</div>
     <div class="print-sub">${weekLabelFromMonday(currentMonday)} &middot; ${label}</div>
-    ${daysHtml}`;
+    ${daysHtml}
+    ${fisicoDetailHtml}`;
   window.print();
 }
 
