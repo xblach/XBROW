@@ -131,7 +131,7 @@
     text-transform:uppercase;color:var(--mute-dim);margin-bottom:5px;
   }
   .block-label svg{width:11px;height:11px;opacity:0.8;}
-  .block-body{font-size:12.5px;line-height:1.42;color:var(--off);white-space:pre-line;}
+  .block-body{font-size:12.5px;line-height:1.42;color:var(--off);white-space:pre-line;overflow-wrap:break-word;}
   .block-body.empty{color:var(--mute-dim);font-style:italic;}
   .block-link{
     display:inline-flex;align-items:center;gap:4px;margin-top:6px;
@@ -250,7 +250,7 @@
   }
   .ergo-entry:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
   .ergo-title{font-weight:600;color:var(--off);margin-bottom:3px;}
-  .ergo-content{white-space:pre-line;color:var(--off);font-size:12px;line-height:1.4;}
+  .ergo-content{white-space:pre-line;color:var(--off);font-size:12px;line-height:1.4;overflow-wrap:break-word;}
 
   /* ---- edit toggle button ---- */
   .edit-toggle-btn{
@@ -488,6 +488,17 @@
   }
   .add-regata-row{display:flex;justify-content:flex-start;margin:6px 0 20px;}
 
+  /* ---- Copiar semana a otra categoría ---- */
+  .copy-week-box{
+    background:var(--panel-hi);border:1px solid var(--line);border-radius:4px;
+    padding:16px;margin-top:22px;
+  }
+  .copy-target-row{
+    display:flex;align-items:center;gap:8px;padding:6px 0;
+    font-family:'Inter',sans-serif;font-size:12.5px;color:var(--off);cursor:pointer;
+  }
+  .copy-target-row input{accent-color:var(--red);cursor:pointer;}
+
   /* ---- Aviso automático de regata en la vista semanal ---- */
   .race-badge{
     background:var(--red);color:var(--off);font-family:'JetBrains Mono',monospace;
@@ -629,10 +640,17 @@
     <button class="week-nav-btn" id="editNextBtn">›</button>
   </div>
   <div class="days-grid" id="editorGrid" style="margin-top:18px;"></div>
+
+  <div class="copy-week-box">
+    <div class="lib-col-title" style="margin-bottom:10px;">Copiar esta semana a otra categoría</div>
+    <div id="copyTargetsList"></div>
+    <button class="editor-btn ghost" id="copyWeekBtn" style="margin-top:12px;">Copiar semana seleccionada</button>
+  </div>
+
   <div style="display:flex;justify-content:flex-end;margin-top:22px;">
     <button class="editor-btn save" id="saveWeekBtn">Guardar cambios</button>
   </div>
-  <div class="save-toast" id="saveToast">✓ Cambios guardados (demo — aún sin conectar a base de datos)</div>
+  <div class="save-toast" id="saveToast">✓ Cambios guardados</div>
 </section>
 
   <div id="printArea"></div>
@@ -1087,10 +1105,62 @@ function renderEditorGrid(){
       No hay ninguna semana creada para estas fechas.<br><br>
       <button class="editor-btn" onclick="createBlankWeek()">+ Crear esta semana</button>
     </div>`;
-    return;
+  } else {
+    editorGrid.innerHTML = currentWeek.days.map((day, i) => editDayCard(day, i, false)).join('');
   }
-  editorGrid.innerHTML = currentWeek.days.map((day, i) => editDayCard(day, i, false)).join('');
+  renderCopyTargets();
 }
+
+function renderCopyTargets(){
+  const el = document.getElementById('copyTargetsList');
+  if(!el) return;
+  const targets = CATEGORIES.filter(c => c.id !== currentCategoryId);
+  if(targets.length === 0){ el.innerHTML = '<div class="lib-empty-msg">No hay otras categorías disponibles.</div>'; return; }
+  el.innerHTML = targets.map(c => {
+    const team = TEAMS.find(t => t.id === c.team_id);
+    const label = team ? `${team.name} · ${c.name}` : c.name;
+    return `<label class="copy-target-row"><input type="checkbox" value="${c.id}" class="copy-target-cb"> ${label}</label>`;
+  }).join('');
+}
+
+async function copyCurrentWeekTo(targetCategoryIds){
+  if(!currentWeek){ alert('No hay ninguna semana cargada para copiar.'); return; }
+  for(const catId of targetCategoryIds){
+    let weekId;
+    const { data: existing } = await sb.from('weeks').select('id').eq('category_id', catId).eq('start_date', currentWeek.start_date).limit(1);
+    if(existing && existing.length){
+      weekId = existing[0].id;
+    } else {
+      weekId = await ensureWeekAt(currentWeek.start_date, catId);
+    }
+    const { data: days } = await sb.from('training_days').select('id,day_date').eq('week_id', weekId).order('day_date');
+    for(let i = 0; i < 7; i++){
+      const src = currentWeek.days[i];
+      const dst = days[i];
+      await sb.from('day_fisico').delete().eq('day_id', dst.id);
+      await sb.from('day_ergo').delete().eq('day_id', dst.id);
+      await sb.from('training_days').update({
+        is_rest: src.isRest,
+        agua_text: src.isRest ? null : src.blocks.agua
+      }).eq('id', dst.id);
+      if(!src.isRest){
+        if(src.blocks.fisico.length) await sb.from('day_fisico').insert(src.blocks.fisico.map((tid, pos) => ({ day_id: dst.id, table_id: tid, position: pos })));
+        if(src.blocks.ergo.length) await sb.from('day_ergo').insert(src.blocks.ergo.map((eid, pos) => ({ day_id: dst.id, ergo_id: eid, position: pos })));
+      }
+    }
+  }
+  alert('Semana copiada correctamente.');
+}
+document.getElementById('copyWeekBtn').addEventListener('click', async () => {
+  const ids = Array.from(document.querySelectorAll('.copy-target-cb:checked')).map(cb => cb.value);
+  if(ids.length === 0){ alert('Selecciona al menos una categoría de destino.'); return; }
+  const labels = Array.from(document.querySelectorAll('.copy-target-cb:checked')).map(cb => cb.closest('.copy-target-row').textContent.trim());
+  if(!confirm(`¿Copiar esta semana a: ${labels.join(', ')}? Si ya tienen algo esa semana, se sobrescribirá.`)) return;
+  const btn = document.getElementById('copyWeekBtn');
+  btn.disabled = true; btn.textContent = 'Copiando...';
+  await copyCurrentWeekTo(ids);
+  btn.disabled = false; btn.textContent = 'Copiar semana seleccionada';
+});
 
 // ============================================================================
 // EXPORTAR PDF
