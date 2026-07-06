@@ -1080,7 +1080,7 @@ function renderEditorGrid(){
 function exportPDF(){
   if(!currentWeek){ alert('No hay ninguna semana cargada para exportar.'); return; }
   const logoSrc = document.querySelector('.brand img').src;
-  const siteUrl = 'https://xbrow.app/entrenos'; // placeholder hasta tener dominio propio
+  const siteUrl = 'https://xbrow.vercel.app'; // placeholder hasta tener dominio propio
   const label = currentLabel();
 
   const daysHtml = currentWeek.days.map((day, i) => {
