@@ -539,9 +539,16 @@
     .print-fisico-section{margin-top:6px;}
     .print-fisico-table{break-inside:avoid;margin-top:14px;padding-top:8px;border-top:1px solid #ddd;}
     .print-fisico-table h4{font-family:'Oswald',sans-serif;font-size:12.5px;margin:0 0 6px;color:#B8281F;text-transform:uppercase;letter-spacing:0.03em;}
-    .print-ex-row{font-size:11px;padding:4px 0;border-bottom:1px dotted #ddd;}
-    .print-ex-name{font-weight:600;margin-right:8px;}
-    .print-ex-detail{color:#555;}
+    .print-ex-table{width:100%;border-collapse:collapse;margin-top:4px;}
+    .print-ex-table th{
+      text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;
+      letter-spacing:0.03em;color:#888;border-bottom:1px solid #ccc;padding:4px 6px;
+    }
+    .print-ex-table td{font-size:10.5px;padding:5px 6px;border-bottom:1px solid #eee;vertical-align:middle;}
+    .print-ex-img-cell{width:46px;}
+    .print-ex-img{width:40px;height:40px;object-fit:cover;border-radius:3px;border:1px solid #ddd;display:block;}
+    .print-ex-name-cell{font-weight:600;}
+    .print-ex-empty{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#999;font-style:italic;padding:4px 0;}
   }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1226,16 +1233,27 @@ function exportPDF(){
     const tablesHtml = usedFisicoIds.map(id => {
       const t = findFisicoTable(id);
       if(!t) return '';
-      const exRows = (t.exercises.length === 0)
-        ? `<div class="print-ex-row"><span class="print-ex-name">Sin ejercicios asignados</span></div>`
-        : t.exercises.map(ex => {
-            const unit = ex.mode === 'time' ? 'seg' : 'reps';
-            return `<div class="print-ex-row">
-              <span class="print-ex-name">${ex.name}</span>
-              <span class="print-ex-detail">${ex.series} series × ${ex.value} ${unit} &middot; desc. series ${ex.restSeries}s &middot; desc. después ${ex.restAfter}s</span>
-            </div>`;
-          }).join('');
-      return `<div class="print-fisico-table"><h4>${t.name}</h4>${exRows}</div>`;
+      if(t.exercises.length === 0){
+        return `<div class="print-fisico-table"><h4>${t.name}</h4><div class="print-ex-empty">Sin ejercicios asignados</div></div>`;
+      }
+      const exRows = t.exercises.map(ex => {
+        const unit = ex.mode === 'time' ? 'seg' : 'reps';
+        const imgCell = ex.image ? `<img class="print-ex-img" src="${ex.image}">` : '';
+        return `<tr>
+          <td class="print-ex-img-cell">${imgCell}</td>
+          <td class="print-ex-name-cell">${ex.name}</td>
+          <td>${ex.series}</td>
+          <td>${ex.value} ${unit}</td>
+          <td>${ex.restSeries}s</td>
+          <td>${ex.restAfter}s</td>
+        </tr>`;
+      }).join('');
+      return `<div class="print-fisico-table"><h4>${t.name}</h4>
+        <table class="print-ex-table">
+          <thead><tr><th></th><th>Ejercicio</th><th>Series</th><th>Reps/Seg</th><th>Desc. series</th><th>Desc. después</th></tr></thead>
+          <tbody>${exRows}</tbody>
+        </table>
+      </div>`;
     }).join('');
     fisicoDetailHtml = `<div class="print-fisico-section">
       <div class="print-title" style="font-size:15px;margin-top:22px;">Ejercicios de Físico de esta semana</div>
