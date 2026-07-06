@@ -249,6 +249,8 @@
     margin-bottom:8px;padding-bottom:8px;border-bottom:1px dashed var(--line);
   }
   .ergo-entry:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+  .ergo-title{font-weight:600;color:var(--off);margin-bottom:3px;}
+  .ergo-content{white-space:pre-line;color:var(--off);font-size:12px;line-height:1.4;}
 
   /* ---- edit toggle button ---- */
   .edit-toggle-btn{
@@ -338,11 +340,12 @@
   .lib-mini-btn:hover{color:var(--off);border-color:var(--mute-dim);}
   .lib-mini-btn.del:hover{color:var(--red);border-color:var(--red-dim);}
   .lib-add-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
-  .lib-add-row input{
+  .lib-add-row input, .lib-add-row textarea{
     flex:1;min-width:140px;background:var(--panel-hi);border:1px solid var(--line);border-radius:3px;
     color:var(--off);font-family:'Inter',sans-serif;font-size:12px;padding:8px 10px;
   }
-  .lib-add-row input:focus{outline:none;border-color:var(--red-dim);}
+  .lib-add-row textarea{resize:vertical;width:100%;}
+  .lib-add-row input:focus, .lib-add-row textarea:focus{outline:none;border-color:var(--red-dim);}
   .lib-empty-msg{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute-dim);padding:10px 4px;}
 
   .lib-manage-btn{
@@ -510,6 +513,8 @@
     .print-day h3{font-family:'Oswald',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 6px;}
     .print-day h3 .pdate{color:#888;font-weight:400;font-family:'JetBrains Mono',monospace;font-size:10px;margin-left:6px;}
     .print-block{font-size:11.5px;margin:3px 0;white-space:pre-line;}
+    .print-ergo-entry{margin-bottom:4px;}
+    .print-ergo-content{white-space:pre-line;color:#333;font-weight:400;margin-top:2px;}
     .print-block b{font-family:'Oswald',sans-serif;font-size:9.5px;text-transform:uppercase;letter-spacing:0.04em;color:#B8281F;margin-right:6px;}
     .print-day a{color:#B8281F;text-decoration:underline;}
     .print-rest{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#999;font-style:italic;}
@@ -667,10 +672,11 @@
       <div class="lib-col">
         <div class="lib-col-title">Ergómetro</div>
         <div id="ergoLibList"></div>
-        <div class="lib-add-row">
-          <input type="text" id="ergoNewName" placeholder="Nombre del nuevo entreno (ej. 8x500m R2)">
+        <div class="lib-add-row" style="flex-direction:column;align-items:stretch;">
+          <input type="text" id="ergoNewName" placeholder="Título (ej. Series pirámide)">
+          <textarea id="ergoNewContent" placeholder="Entreno (opcional) — respeta los saltos de línea que escribas" rows="3"></textarea>
           <input type="url" id="ergoNewLink" placeholder="Link (opcional)">
-          <button class="editor-btn" id="ergoAddBtn">+ Añadir</button>
+          <button class="editor-btn" id="ergoAddBtn" style="align-self:flex-start;">+ Añadir</button>
         </div>
       </div>
     </div>
@@ -827,7 +833,7 @@ async function loadLibraries(){
   }));
 
   const { data: ergo } = await sb.from('ergo_tables').select('*').order('sort_order');
-  ERGO_TABLES = (ergo || []).map(t => ({ id: t.id, name: t.name, link: t.link, sortOrder: t.sort_order }));
+  ERGO_TABLES = (ergo || []).map(t => ({ id: t.id, name: t.name, link: t.link, content: t.content, sortOrder: t.sort_order }));
 }
 
 async function loadRegattas(){
@@ -909,7 +915,9 @@ function blockRow(label, iconKey, content){
       const item = ergoItem(id);
       if(!item) return '';
       const linkBtn = item.link ? `<a class="block-link" href="${item.link}" target="_blank">${ICONS.x}Ver</a>` : '';
-      return `<div class="ergo-entry">${item.name}${linkBtn}</div>`;
+      const titleHtml = `<div class="ergo-title">${item.name}</div>`;
+      const bodyHtml = item.content ? `<div class="ergo-content">${item.content}</div>` : '';
+      return `<div class="ergo-entry">${titleHtml}${bodyHtml}${linkBtn}</div>`;
     }).join('');
     return `<div class="block"><div class="block-label">${ICONS.ergo}${label}</div><div class="block-body">${chips}</div></div>`;
   }
@@ -1099,7 +1107,12 @@ function exportPDF(){
     const parts = [];
     if(day.blocks.agua) parts.push(`<div class="print-block"><b>Agua</b>${day.blocks.agua}</div>`);
     if(day.blocks.ergo.length){
-      const ergoLines = day.blocks.ergo.map(id => { const item = ergoItem(id); if(!item) return ''; return item.link ? `<a href="${item.link}" target="_blank">${item.name}</a>` : item.name; }).join(' &middot; ');
+      const ergoLines = day.blocks.ergo.map(id => {
+        const item = ergoItem(id); if(!item) return '';
+        const titlePart = item.link ? `<a href="${item.link}" target="_blank">${item.name}</a>` : item.name;
+        const contentPart = item.content ? `<div class="print-ergo-content">${item.content}</div>` : '';
+        return `<div class="print-ergo-entry">${titlePart}${contentPart}</div>`;
+      }).join('');
       parts.push(`<div class="print-block"><b>Ergómetro</b>${ergoLines}</div>`);
     }
     if(day.blocks.fisico.length){
@@ -1300,19 +1313,24 @@ function renderErgoLib(){
   const el = document.getElementById('ergoLibList');
   if(ERGO_TABLES.length === 0){ el.innerHTML = '<div class="lib-empty-msg">Sin entrenos todavía. Añade el primero abajo.</div>'; return; }
   el.innerHTML = ERGO_TABLES.map((t, idx) => `
-    <div class="lib-row">
-      <div class="lib-row-main">
-        <input class="lib-row-name" value="${t.name}" onchange="renameErgo('${t.id}', this.value)">
+    <div class="lib-row" style="flex-direction:column;align-items:stretch;">
+      <div class="lib-row-main" style="display:flex;flex-direction:column;gap:6px;">
+        <input class="lib-row-name" value="${t.name}" placeholder="Título" onchange="renameErgo('${t.id}', this.value)">
+        <textarea class="lib-row-name" style="min-height:60px;resize:vertical;font-family:'JetBrains Mono',monospace;font-size:11px;" placeholder="Entreno (opcional) — respeta los saltos de línea" onchange="updateErgoContent('${t.id}', this.value)">${t.content || ''}</textarea>
         <input class="lib-row-link ${t.link ? '' : 'empty'}" value="${t.link ? t.link : ''}" placeholder="Sin link — toca para añadir uno"
                onfocus="this.classList.remove('empty')" onblur="this.classList.toggle('empty', !this.value.trim())"
                onchange="relinkErgo('${t.id}', this.value)">
       </div>
-      <div class="lib-row-actions">
+      <div class="lib-row-actions" style="justify-content:flex-end;margin-top:6px;">
         <button class="lib-mini-btn" title="Subir" onclick="moveErgo(${idx}, -1)">↑</button>
         <button class="lib-mini-btn" title="Bajar" onclick="moveErgo(${idx}, 1)">↓</button>
         <button class="lib-mini-btn del" title="Eliminar" onclick="deleteErgo('${t.id}')">✕</button>
       </div>
     </div>`).join('');
+}
+async function updateErgoContent(id, value){
+  await sb.from('ergo_tables').update({ content: value.trim() ? value : null }).eq('id', id);
+  await loadLibraries(); renderErgoLib();
 }
 async function renameErgo(id, value){
   const v = value.trim(); if(!v) return;
@@ -1338,10 +1356,16 @@ async function deleteErgo(id){
 }
 document.getElementById('ergoAddBtn').addEventListener('click', async () => {
   const nameInput = document.getElementById('ergoNewName');
+  const contentInput = document.getElementById('ergoNewContent');
   const linkInput = document.getElementById('ergoNewLink');
   const name = nameInput.value.trim(); if(!name) return;
-  await sb.from('ergo_tables').insert({ name, link: linkInput.value.trim() ? linkInput.value.trim() : null, sort_order: ERGO_TABLES.length });
-  nameInput.value = ''; linkInput.value = '';
+  await sb.from('ergo_tables').insert({
+    name,
+    content: contentInput.value.trim() ? contentInput.value : null,
+    link: linkInput.value.trim() ? linkInput.value.trim() : null,
+    sort_order: ERGO_TABLES.length
+  });
+  nameInput.value = ''; contentInput.value = ''; linkInput.value = '';
   await loadLibraries(); renderErgoLib();
 });
 
