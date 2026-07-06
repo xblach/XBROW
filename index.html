@@ -728,6 +728,7 @@ let ERGO_TABLES = [];
 let REGATAS = [];              // agrupado por group_name para pintar
 let REGATAS_BY_DATE = {};      // iso date -> [regatas ese día], para avisar en la semana de entrenos
 let currentCategoryId = null;
+let currentTeamId = null;      // para el calendario de regatas, que es por equipo
 let currentMonday = null;      // fecha (lunes) de la semana que se está viendo
 let currentWeek = null;        // { id, start_date, days:[{id, iso, d, isRest, blocks:{agua, ergo:[ids], fisico:[ids]}}] }
 let editMode = false;
@@ -855,7 +856,8 @@ async function loadLibraries(){
 }
 
 async function loadRegattas(){
-  const { data: rows } = await sb.from('regattas').select('*').order('sort_order');
+  if(!currentTeamId){ REGATAS = []; REGATAS_BY_DATE = {}; return; }
+  const { data: rows } = await sb.from('regattas').select('*').eq('team_id', currentTeamId).order('sort_order');
   const groups = [];
   REGATAS_BY_DATE = {};
   (rows || []).forEach(r => {
@@ -905,8 +907,9 @@ async function refreshCurrentWeek(){
 async function onLoggedIn(){
   await loadTeamsAndCategories();
   await loadLibraries();
-  await loadRegattas();
   currentCategoryId = getCategoryId('banco-fijo', 'absolutos');
+  currentTeamId = (TEAMS.find(t => t.slug === 'banco-fijo') || {}).id || null;
+  await loadRegattas();
   currentMonday = thisMonday();
   weekTag.textContent = currentLabel();
   await loadWeek(currentCategoryId, currentMonday);
@@ -1447,6 +1450,8 @@ function renderRegatas(){
   const isEditor = userRole === 'editor';
   document.getElementById('regatasHint').style.display = isEditor ? '' : 'none';
   document.getElementById('newGroupRow').style.display = isEditor ? 'flex' : 'none';
+  const teamName = (TEAMS.find(t => t.id === currentTeamId) || {}).name || '';
+  document.getElementById('regatasEyebrow').textContent = teamName ? `${teamName} · Temporada 2026 — 2027` : 'Temporada 2026 — 2027';
 
   wrap.innerHTML = REGATAS.map(group => {
     const rows = group.races.map(r => {
@@ -1500,6 +1505,7 @@ async function addRegatta(groupName){
   const maxSort = REGATAS.flatMap(g => g.races).length;
   await sb.from('regattas').insert({
     group_name: groupName,
+    team_id: currentTeamId,
     race_date: todayISO(),
     competition: 'Nueva competición',
     location: null,
@@ -1569,8 +1575,15 @@ async function switchCategory(){
   const teamSlug = activeTeamBtn.dataset.slug;
   const subSlug = document.querySelector('.sub-tab.active')?.dataset.slug || 'absolutos';
   currentCategoryId = getCategoryId(teamSlug, subSlug);
+  const newTeamId = (TEAMS.find(t => t.slug === teamSlug) || {}).id || null;
+  const teamChanged = newTeamId !== currentTeamId;
+  currentTeamId = newTeamId;
   weekTag.textContent = currentLabel();
   await loadWeek(currentCategoryId, currentMonday);
+  if(teamChanged){
+    await loadRegattas();
+    renderRegatas();
+  }
   render();
 }
 const teamTabs = document.querySelectorAll('.team-tab');
