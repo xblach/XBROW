@@ -1,0 +1,16 @@
+{
+  "name": "XBROW — Rem de Mar & Banco Fijo",
+  "short_name": "XBROW",
+  "description": "Entrenos semanales y calendario de regatas de Rem de Mar y Banco Fijo.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111317",
+  "theme_color": "#E23A2E",
+  "icons": [
+    { "src": "favicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "app-icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "maskable-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
