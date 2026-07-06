@@ -348,6 +348,13 @@
   .lib-add-row input:focus, .lib-add-row textarea:focus{outline:none;border-color:var(--red-dim);}
   .lib-empty-msg{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute-dim);padding:10px 4px;}
 
+  .team-scope-row{display:flex;gap:14px;margin:2px 0;}
+  .team-scope-cb{
+    display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;
+    font-size:10px;color:var(--mute);cursor:pointer;user-select:none;
+  }
+  .team-scope-cb input{accent-color:var(--red);cursor:pointer;}
+
   .lib-manage-btn{
     font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--red);background:none;
     border:none;cursor:pointer;padding:0;margin-left:2px;white-space:nowrap;
@@ -685,9 +692,13 @@
       <div class="lib-col">
         <div class="lib-col-title">Físico</div>
         <div id="fisicoLibList"></div>
-        <div class="lib-add-row">
+        <div class="lib-add-row" style="flex-direction:column;align-items:stretch;">
           <input type="text" id="fisicoNewName" placeholder="Nombre de la nueva tabla (ej. Fuerza 3)">
-          <button class="editor-btn" id="fisicoAddBtn">+ Añadir</button>
+          <div class="team-scope-row">
+            <label class="team-scope-cb"><input type="checkbox" id="fisicoNewRem" checked> RdM</label>
+            <label class="team-scope-cb"><input type="checkbox" id="fisicoNewBanco" checked> BF</label>
+          </div>
+          <button class="editor-btn" id="fisicoAddBtn" style="align-self:flex-start;">+ Añadir</button>
         </div>
       </div>
 
@@ -698,6 +709,10 @@
           <input type="text" id="ergoNewName" placeholder="Título (ej. Series pirámide)">
           <textarea id="ergoNewContent" placeholder="Entreno (opcional) — respeta los saltos de línea que escribas" rows="3"></textarea>
           <input type="url" id="ergoNewLink" placeholder="Link (opcional)">
+          <div class="team-scope-row">
+            <label class="team-scope-cb"><input type="checkbox" id="ergoNewRem" checked> RdM</label>
+            <label class="team-scope-cb"><input type="checkbox" id="ergoNewBanco" checked> BF</label>
+          </div>
           <button class="editor-btn" id="ergoAddBtn" style="align-self:flex-start;">+ Añadir</button>
         </div>
       </div>
@@ -733,6 +748,8 @@ let REGATAS = [];              // agrupado por group_name para pintar
 let REGATAS_BY_DATE = {};      // iso date -> [regatas ese día], para avisar en la semana de entrenos
 let currentCategoryId = null;
 let currentTeamId = null;      // para el calendario de regatas, que es por equipo
+let REM_TEAM_ID = null;
+let BANCO_TEAM_ID = null;
 let currentMonday = null;      // fecha (lunes) de la semana que se está viendo
 let currentWeek = null;        // { id, start_date, days:[{id, iso, d, isRest, blocks:{agua, ergo:[ids], fisico:[ids]}}] }
 let editMode = false;
@@ -835,6 +852,8 @@ async function loadTeamsAndCategories(){
   const { data: cats } = await sb.from('categories').select('*').order('sort_order');
   TEAMS = teams || [];
   CATEGORIES = cats || [];
+  REM_TEAM_ID = (TEAMS.find(t => t.slug === 'rem-de-mar') || {}).id || null;
+  BANCO_TEAM_ID = (TEAMS.find(t => t.slug === 'banco-fijo') || {}).id || null;
 }
 function getCategoryId(teamSlug, subSlug){
   if(teamSlug === 'rem-de-mar') subSlug = 'general';
@@ -848,7 +867,7 @@ async function loadLibraries(){
   const { data: tables } = await sb.from('fisico_tables').select('*').order('sort_order');
   const { data: exercises } = await sb.from('fisico_exercises').select('*').order('sort_order');
   FISICO_TABLES = (tables || []).map(t => ({
-    id: t.id, name: t.name, sortOrder: t.sort_order,
+    id: t.id, name: t.name, sortOrder: t.sort_order, teamIds: t.team_ids || [],
     exercises: (exercises || []).filter(e => e.table_id === t.id).map(e => ({
       id: e.id, name: e.name, image: e.image_url, series: e.series, mode: e.mode,
       value: e.value, restSeries: e.rest_series, restAfter: e.rest_after, sortOrder: e.sort_order
@@ -856,7 +875,7 @@ async function loadLibraries(){
   }));
 
   const { data: ergo } = await sb.from('ergo_tables').select('*').order('sort_order');
-  ERGO_TABLES = (ergo || []).map(t => ({ id: t.id, name: t.name, link: t.link, content: t.content, sortOrder: t.sort_order }));
+  ERGO_TABLES = (ergo || []).map(t => ({ id: t.id, name: t.name, link: t.link, content: t.content, sortOrder: t.sort_order, teamIds: t.team_ids || [] }));
 }
 
 async function loadRegattas(){
@@ -978,11 +997,11 @@ function readDayCard(day, i, isToday){
 function editDayCard(day, i, isToday){
   const monthLabel = monthLabelOf(day.iso);
   const badge = raceBadgeHTML(day.iso);
-  const fisicoChips = FISICO_TABLES.map(t => {
+  const fisicoChips = FISICO_TABLES.filter(t => !currentTeamId || t.teamIds.includes(currentTeamId)).map(t => {
     const active = day.blocks.fisico.includes(t.id) ? 'active' : '';
     return `<button type="button" class="fisico-chip-btn ${active}" onclick="toggleFisico('${day.id}', '${t.id}')">${t.name}</button>`;
   }).join('');
-  const ergoChips = ERGO_TABLES.map(t => {
+  const ergoChips = ERGO_TABLES.filter(t => !currentTeamId || t.teamIds.includes(currentTeamId)).map(t => {
     const active = day.blocks.ergo.includes(t.id) ? 'active' : '';
     const linkTag = t.link ? '' : ' <span style="opacity:.5;">(sin link)</span>';
     return `<button type="button" class="fisico-chip-btn ${active}" onclick="toggleErgo('${day.id}', '${t.id}')">${t.name}${linkTag}</button>`;
@@ -1239,6 +1258,15 @@ function exportPDF(){
 // ============================================================================
 function renderLibraries(){ renderFisicoLib(); renderErgoLib(); }
 
+function teamCheckboxesHTML(id, teamIds, onToggleFn){
+  const hasRem = teamIds.includes(REM_TEAM_ID);
+  const hasBanco = teamIds.includes(BANCO_TEAM_ID);
+  return `<div class="team-scope-row">
+    <label class="team-scope-cb"><input type="checkbox" ${hasRem ? 'checked' : ''} onchange="${onToggleFn}('${id}', '${REM_TEAM_ID}', this.checked)"> RdM</label>
+    <label class="team-scope-cb"><input type="checkbox" ${hasBanco ? 'checked' : ''} onchange="${onToggleFn}('${id}', '${BANCO_TEAM_ID}', this.checked)"> BF</label>
+  </div>`;
+}
+
 function renderFisicoLib(){
   const el = document.getElementById('fisicoLibList');
   if(FISICO_TABLES.length === 0){ el.innerHTML = '<div class="lib-empty-msg">Sin tablas todavía. Añade la primera abajo.</div>'; return; }
@@ -1248,6 +1276,7 @@ function renderFisicoLib(){
     <div class="lib-row">
       <div class="lib-row-main">
         <input class="lib-row-name" value="${t.name}" onchange="renameFisico('${t.id}', this.value)">
+        ${teamCheckboxesHTML(t.id, t.teamIds, 'toggleFisicoTeam')}
         <button class="lib-manage-btn" onclick="toggleFisicoExercises('${t.id}')">${isOpen ? '▾ Cerrar' : '▸ Gestionar ejercicios'} (${t.exercises.length})</button>
       </div>
       <div class="lib-row-actions">
@@ -1258,6 +1287,14 @@ function renderFisicoLib(){
     </div>
     ${isOpen ? exercisesPanelHTML(t) : ''}`;
   }).join('');
+}
+async function toggleFisicoTeam(tableId, teamId, checked){
+  const t = findFisicoTable(tableId);
+  let ids = t.teamIds.slice();
+  if(checked){ if(!ids.includes(teamId)) ids.push(teamId); }
+  else { ids = ids.filter(id => id !== teamId); }
+  await sb.from('fisico_tables').update({ team_ids: ids }).eq('id', tableId);
+  await loadLibraries(); renderFisicoLib();
 }
 
 function exercisesPanelHTML(table){
@@ -1322,7 +1359,10 @@ async function deleteFisico(tableId){
 document.getElementById('fisicoAddBtn').addEventListener('click', async () => {
   const input = document.getElementById('fisicoNewName');
   const name = input.value.trim(); if(!name) return;
-  await sb.from('fisico_tables').insert({ name, sort_order: FISICO_TABLES.length });
+  const ids = [];
+  if(document.getElementById('fisicoNewRem').checked) ids.push(REM_TEAM_ID);
+  if(document.getElementById('fisicoNewBanco').checked) ids.push(BANCO_TEAM_ID);
+  await sb.from('fisico_tables').insert({ name, team_ids: ids, sort_order: FISICO_TABLES.length });
   input.value = '';
   await loadLibraries(); renderFisicoLib();
 });
@@ -1397,6 +1437,7 @@ function renderErgoLib(){
         <input class="lib-row-link ${t.link ? '' : 'empty'}" value="${t.link ? t.link : ''}" placeholder="Sin link — toca para añadir uno"
                onfocus="this.classList.remove('empty')" onblur="this.classList.toggle('empty', !this.value.trim())"
                onchange="relinkErgo('${t.id}', this.value)">
+        ${teamCheckboxesHTML(t.id, t.teamIds, 'toggleErgoTeam')}
       </div>
       <div class="lib-row-actions" style="justify-content:flex-end;margin-top:6px;">
         <button class="lib-mini-btn" title="Subir" onclick="moveErgo(${idx}, -1)">↑</button>
@@ -1404,6 +1445,14 @@ function renderErgoLib(){
         <button class="lib-mini-btn del" title="Eliminar" onclick="deleteErgo('${t.id}')">✕</button>
       </div>
     </div>`).join('');
+}
+async function toggleErgoTeam(tableId, teamId, checked){
+  const t = ERGO_TABLES.find(t => t.id === tableId);
+  let ids = t.teamIds.slice();
+  if(checked){ if(!ids.includes(teamId)) ids.push(teamId); }
+  else { ids = ids.filter(id => id !== teamId); }
+  await sb.from('ergo_tables').update({ team_ids: ids }).eq('id', tableId);
+  await loadLibraries(); renderErgoLib();
 }
 async function updateErgoContent(id, value){
   await sb.from('ergo_tables').update({ content: value.trim() ? value : null }).eq('id', id);
@@ -1436,10 +1485,14 @@ document.getElementById('ergoAddBtn').addEventListener('click', async () => {
   const contentInput = document.getElementById('ergoNewContent');
   const linkInput = document.getElementById('ergoNewLink');
   const name = nameInput.value.trim(); if(!name) return;
+  const ids = [];
+  if(document.getElementById('ergoNewRem').checked) ids.push(REM_TEAM_ID);
+  if(document.getElementById('ergoNewBanco').checked) ids.push(BANCO_TEAM_ID);
   await sb.from('ergo_tables').insert({
     name,
     content: contentInput.value.trim() ? contentInput.value : null,
     link: linkInput.value.trim() ? linkInput.value.trim() : null,
+    team_ids: ids,
     sort_order: ERGO_TABLES.length
   });
   nameInput.value = ''; contentInput.value = ''; linkInput.value = '';
