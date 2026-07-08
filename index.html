@@ -396,9 +396,10 @@
 
   /* ---- Duplicar día ---- */
   .dup-day-row{
-    display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel-hi);
+    display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel-hi);
   }
-  .dup-day-row select{
+  .dup-day-label{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--mute-dim);white-space:nowrap;}
+  .dup-day-row input[type=date]{
     flex:1;background:var(--panel);border:1px solid var(--line);border-radius:3px;color:var(--off);
     font-family:'Inter',sans-serif;font-size:11px;padding:5px 6px;min-width:0;
   }
@@ -1141,16 +1142,10 @@ function editDayCard(day, i, isToday){
   }).join('');
   const restToggle = `<label class="rest-toggle"><input type="checkbox" ${day.isRest ? 'checked' : ''} onchange="toggleRest('${day.id}')"> Descanso</label>`;
 
-  const otherDays = currentWeek.days
-    .map((d, idx) => ({ d, idx }))
-    .filter(x => x.d.id !== day.id);
-  const dupOptions = otherDays.map(x => `<option value="${x.idx}">${DAYS[x.idx]} (${x.d.d} ${monthLabelOf(x.d.iso)})</option>`).join('');
   const dupControl = `<div class="dup-day-row">
-    <select id="dupSelect_${day.id}">
-      <option value="">Duplicar desde...</option>
-      ${dupOptions}
-    </select>
-    <button type="button" class="lib-mini-btn" title="Duplicar este día" onclick="duplicateDayFrom('${day.id}', document.getElementById('dupSelect_${day.id}').value)">↻</button>
+    <span class="dup-day-label">Duplicar desde:</span>
+    <input type="date" id="dupDate_${day.id}">
+    <button type="button" class="lib-mini-btn" title="Duplicar este día" onclick="duplicateDayFromDate('${day.id}', document.getElementById('dupDate_${day.id}').value)">↻</button>
   </div>`;
 
   if(day.isRest){
@@ -1239,11 +1234,36 @@ async function toggleRest(dayId){
   await refreshCurrentWeek(); render();
 }
 
-async function duplicateDayFrom(targetDayId, sourceIdxStr){
-  if(sourceIdxStr === '') return;
-  const sourceIdx = parseInt(sourceIdxStr, 10);
-  const src = currentWeek.days[sourceIdx];
-  if(!(await customConfirm(`¿Copiar el contenido de ${DAYS[sourceIdx]} sobre este día? Se sobrescribirá lo que hubiera aquí.`, 'Copiar'))) return;
+async function findTrainingDayByDate(categoryId, iso){
+  const { data } = await sb.from('training_days')
+    .select('id, is_rest, agua_text, weeks!inner(category_id)')
+    .eq('day_date', iso)
+    .eq('weeks.category_id', categoryId)
+    .limit(1);
+  if(!data || data.length === 0) return null;
+  const dayId = data[0].id;
+  const { data: dfRows } = await sb.from('day_fisico').select('table_id,position').eq('day_id', dayId).order('position');
+  const { data: deRows } = await sb.from('day_ergo').select('ergo_id,position').eq('day_id', dayId).order('position');
+  return {
+    id: dayId,
+    isRest: data[0].is_rest,
+    blocks: {
+      agua: data[0].agua_text,
+      fisico: (dfRows || []).map(r => r.table_id),
+      ergo: (deRows || []).map(r => r.ergo_id),
+    }
+  };
+}
+
+async function duplicateDayFromDate(targetDayId, sourceDateISO){
+  if(!sourceDateISO) return;
+  const src = await findTrainingDayByDate(currentCategoryId, sourceDateISO);
+  if(!src){
+    alert('No hay ningún entreno guardado para esa fecha en esta categoría.');
+    return;
+  }
+  const label = `${dayNumberOf(sourceDateISO)} ${monthLabelOf(sourceDateISO)}`;
+  if(!(await customConfirm(`¿Copiar el contenido del ${label} sobre este día? Se sobrescribirá lo que hubiera aquí.`, 'Copiar'))) return;
   await sb.from('day_fisico').delete().eq('day_id', targetDayId);
   await sb.from('day_ergo').delete().eq('day_id', targetDayId);
   await sb.from('training_days').update({
