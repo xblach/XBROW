@@ -23,6 +23,20 @@
     --red-dim:#7A231D;
     --teal:#3E6E73;
   }
+  :root[data-theme="light"]{
+    --ink:#F5F3EF;
+    --panel:#FFFFFF;
+    --panel-hi:#F0EDE6;
+    --line:#DEDAD2;
+    --off:#181A1D;
+    --mute:#6B6F76;
+    --mute-dim:#A3A7AD;
+    --red:#D5352A;
+    --red-dim:#F0BEBA;
+    --teal:#3E6E73;
+  }
+  html{transition:background-color .25s ease;}
+  body{transition:background-color .25s ease, color .25s ease;}
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;overflow-x:hidden;}
   body{
@@ -348,6 +362,20 @@
   .lib-add-row input:focus, .lib-add-row textarea:focus{outline:none;border-color:var(--red-dim);}
   .lib-empty-msg{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mute-dim);padding:10px 4px;}
 
+  .lib-search{
+    width:100%;background:var(--panel-hi);border:1px solid var(--line);border-radius:4px;
+    color:var(--off);font-family:'Inter',sans-serif;font-size:12.5px;padding:9px 12px;margin-bottom:10px;
+  }
+  .lib-search:focus{outline:none;border-color:var(--red-dim);}
+
+  /* ---- Modal de confirmación (sustituye al confirm() del navegador) ---- */
+  .confirm-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    max-width:360px;width:100%;padding:22px;
+  }
+  .confirm-message{font-size:13.5px;line-height:1.5;color:var(--off);margin-bottom:18px;}
+  .confirm-actions{display:flex;justify-content:flex-end;gap:10px;}
+
   .team-scope-row{display:flex;gap:14px;margin:2px 0;}
   .team-scope-cb{
     display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;
@@ -365,6 +393,15 @@
     color:var(--red);margin-bottom:6px;
   }
   .week-note-text{font-size:13px;line-height:1.5;color:var(--off);white-space:pre-line;overflow-wrap:break-word;}
+
+  /* ---- Duplicar día ---- */
+  .dup-day-row{
+    display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel-hi);
+  }
+  .dup-day-row select{
+    flex:1;background:var(--panel);border:1px solid var(--line);border-radius:3px;color:var(--off);
+    font-family:'Inter',sans-serif;font-size:11px;padding:5px 6px;min-width:0;
+  }
 
   .lib-manage-btn{
     font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--red);background:none;
@@ -448,6 +485,11 @@
     border:none;cursor:pointer;text-decoration:underline;padding:0;
   }
   .logout-link:hover{color:var(--red);}
+  .theme-toggle-btn{
+    background:none;border:1px solid var(--line);border-radius:100px;color:var(--off);
+    width:30px;height:30px;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .theme-toggle-btn:hover{border-color:var(--mute-dim);}
 
   /* ---- Pantalla de acceso por código ---- */
   .gate-overlay{
@@ -505,6 +547,14 @@
     border:1px solid var(--red-dim);border-radius:3px;padding:5px 10px;cursor:pointer;margin-left:auto;
   }
   .add-regata-row{display:flex;justify-content:flex-start;margin:6px 0 20px;}
+
+  .regata-cat-checks{display:flex;flex-wrap:wrap;gap:10px;margin-top:2px;}
+  .cat-check{
+    display:flex;align-items:center;gap:4px;font-family:'JetBrains Mono',monospace;
+    font-size:10.5px;color:var(--mute);cursor:pointer;user-select:none;
+  }
+  .cat-check input{accent-color:var(--red);cursor:pointer;}
+  .cat-check-all{color:var(--red);border-left:1px solid var(--line);padding-left:10px;margin-left:2px;}
 
   /* ---- Copiar semana a otra categoría ---- */
   .copy-week-box{
@@ -590,6 +640,7 @@
     <div class="brand-text">X<span>BROW</span></div>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
+    <button class="theme-toggle-btn" id="themeToggleBtn" title="Cambiar tema claro/oscuro">🌙</button>
     <div class="role-pill" id="rolePill">EDITOR · VISTA PREVIA</div>
     <button class="logout-link" id="logoutBtn">Cerrar sesión</button>
   </div>
@@ -709,6 +760,16 @@
   </div>
 </div>
 
+<div id="confirmModal" class="modal-overlay" style="display:none;">
+  <div class="confirm-card">
+    <div class="confirm-message" id="confirmMessage">¿Seguro?</div>
+    <div class="confirm-actions">
+      <button class="editor-btn ghost" id="confirmCancelBtn">Cancelar</button>
+      <button class="editor-btn save" id="confirmOkBtn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
 <section id="viewBibliotecas" style="display:none;">
   <div class="wrap">
     <div class="regatas-head">
@@ -722,6 +783,7 @@
     <div class="lib-columns">
       <div class="lib-col">
         <div class="lib-col-title">Físico</div>
+        <input type="text" id="fisicoSearch" class="lib-search" placeholder="🔎 Buscar tabla o ejercicio...">
         <div id="fisicoLibList"></div>
         <div class="lib-add-row" style="flex-direction:column;align-items:stretch;">
           <input type="text" id="fisicoNewName" placeholder="Nombre de la nueva tabla (ej. Fuerza 3)">
@@ -735,6 +797,7 @@
 
       <div class="lib-col">
         <div class="lib-col-title">Ergómetro</div>
+        <input type="text" id="ergoSearch" class="lib-search" placeholder="🔎 Buscar título o entreno...">
         <div id="ergoLibList"></div>
         <div class="lib-add-row" style="flex-direction:column;align-items:stretch;">
           <input type="text" id="ergoNewName" placeholder="Título (ej. Series pirámide)">
@@ -752,6 +815,44 @@
 </section>
 
 <script>
+// ============================================================================
+// Tema claro (de día) / oscuro (de noche)
+// ============================================================================
+// Automático según la hora del dispositivo (7:00–20:59 claro, resto oscuro),
+// pero si el usuario lo cambia a mano con el botón, esa elección manda hasta
+// que la borre (guardada en este navegador).
+const THEME_STORAGE_KEY = 'xbrow-theme-override';
+
+function autoThemeForNow(){
+  const hour = new Date().getHours();
+  return (hour >= 7 && hour < 21) ? 'light' : 'dark';
+}
+function applyTheme(theme){
+  if(theme === 'light'){
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  const btn = document.getElementById('themeToggleBtn');
+  if(btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
+}
+function currentEffectiveTheme(){
+  const override = localStorage.getItem(THEME_STORAGE_KEY);
+  return override || autoThemeForNow();
+}
+function refreshTheme(){
+  applyTheme(currentEffectiveTheme());
+}
+document.getElementById('themeToggleBtn').addEventListener('click', () => {
+  const next = currentEffectiveTheme() === 'light' ? 'dark' : 'light';
+  localStorage.setItem(THEME_STORAGE_KEY, next);
+  applyTheme(next);
+});
+refreshTheme();
+// Revisa cada 15 minutos por si cambia de franja horaria mientras la pestaña sigue abierta
+// (solo afecta si el usuario no ha fijado una preferencia manual)
+setInterval(() => { if(!localStorage.getItem(THEME_STORAGE_KEY)) refreshTheme(); }, 15 * 60 * 1000);
+
 // ============================================================================
 // XBROW — Conexión a Supabase (Fase 2)
 // ============================================================================
@@ -1040,16 +1141,30 @@ function editDayCard(day, i, isToday){
   }).join('');
   const restToggle = `<label class="rest-toggle"><input type="checkbox" ${day.isRest ? 'checked' : ''} onchange="toggleRest('${day.id}')"> Descanso</label>`;
 
+  const otherDays = currentWeek.days
+    .map((d, idx) => ({ d, idx }))
+    .filter(x => x.d.id !== day.id);
+  const dupOptions = otherDays.map(x => `<option value="${x.idx}">${DAYS[x.idx]} (${x.d.d} ${monthLabelOf(x.d.iso)})</option>`).join('');
+  const dupControl = `<div class="dup-day-row">
+    <select id="dupSelect_${day.id}">
+      <option value="">Duplicar desde...</option>
+      ${dupOptions}
+    </select>
+    <button type="button" class="lib-mini-btn" title="Duplicar este día" onclick="duplicateDayFrom('${day.id}', document.getElementById('dupSelect_${day.id}').value)">↻</button>
+  </div>`;
+
   if(day.isRest){
     return `<div class="day-col ${isToday ? 'is-today' : ''}">
       <div class="edit-day-head"><div><div class="dname">${DAYS[i]}</div><div class="ddate">${day.d} ${monthLabel}</div></div>${restToggle}</div>
       ${badge}
+      ${dupControl}
       <div class="rest-edit-msg">Día marcado como descanso.<br>Desmarca la casilla para añadir entrenos.</div>
     </div>`;
   }
   return `<div class="day-col ${isToday ? 'is-today' : ''}">
     <div class="edit-day-head"><div><div class="dname">${DAYS[i]}</div><div class="ddate">${day.d} ${monthLabel}</div></div>${restToggle}</div>
     ${badge}
+    ${dupControl}
     <div class="edit-block">
       <div class="block-label">${ICONS.agua}Agua</div>
       <textarea rows="2" placeholder="Texto libre..." onchange="updateAgua('${day.id}', this.value)">${day.blocks.agua || ''}</textarea>
@@ -1122,6 +1237,25 @@ async function toggleRest(dayId){
   const day = currentWeek.days.find(d => d.id === dayId);
   await sb.from('training_days').update({ is_rest: !day.isRest }).eq('id', dayId);
   await refreshCurrentWeek(); render();
+}
+
+async function duplicateDayFrom(targetDayId, sourceIdxStr){
+  if(sourceIdxStr === '') return;
+  const sourceIdx = parseInt(sourceIdxStr, 10);
+  const src = currentWeek.days[sourceIdx];
+  if(!(await customConfirm(`¿Copiar el contenido de ${DAYS[sourceIdx]} sobre este día? Se sobrescribirá lo que hubiera aquí.`, 'Copiar'))) return;
+  await sb.from('day_fisico').delete().eq('day_id', targetDayId);
+  await sb.from('day_ergo').delete().eq('day_id', targetDayId);
+  await sb.from('training_days').update({
+    is_rest: src.isRest,
+    agua_text: src.isRest ? null : src.blocks.agua
+  }).eq('id', targetDayId);
+  if(!src.isRest){
+    if(src.blocks.fisico.length) await sb.from('day_fisico').insert(src.blocks.fisico.map((tid, pos) => ({ day_id: targetDayId, table_id: tid, position: pos })));
+    if(src.blocks.ergo.length) await sb.from('day_ergo').insert(src.blocks.ergo.map((eid, pos) => ({ day_id: targetDayId, ergo_id: eid, position: pos })));
+  }
+  await refreshCurrentWeek();
+  render();
 }
 
 // ============================================================================
@@ -1231,7 +1365,7 @@ document.getElementById('copyWeekBtn').addEventListener('click', async () => {
   const ids = Array.from(document.querySelectorAll('.copy-target-cb:checked')).map(cb => cb.value);
   if(ids.length === 0){ alert('Selecciona al menos una categoría de destino.'); return; }
   const labels = Array.from(document.querySelectorAll('.copy-target-cb:checked')).map(cb => cb.closest('.copy-target-row').textContent.trim());
-  if(!confirm(`¿Copiar esta semana a: ${labels.join(', ')}? Si ya tienen algo esa semana, se sobrescribirá.`)) return;
+  if(!(await customConfirm(`¿Copiar esta semana a: ${labels.join(', ')}? Si ya tienen algo esa semana, se sobrescribirá.`, 'Copiar'))) return;
   const btn = document.getElementById('copyWeekBtn');
   btn.disabled = true; btn.textContent = 'Copiando...';
   await copyCurrentWeekTo(ids);
@@ -1333,10 +1467,30 @@ function teamCheckboxesHTML(id, teamIds, onToggleFn){
   </div>`;
 }
 
+let fisicoSearchQuery = '';
+let ergoSearchQuery = '';
+
+function matchesFisicoSearch(t, q){
+  if(!q) return true;
+  if(t.name.toLowerCase().includes(q)) return true;
+  return t.exercises.some(ex => ex.name.toLowerCase().includes(q));
+}
+function matchesErgoSearch(t, q){
+  if(!q) return true;
+  if(t.name.toLowerCase().includes(q)) return true;
+  if(t.content && t.content.toLowerCase().includes(q)) return true;
+  return false;
+}
+
 function renderFisicoLib(){
   const el = document.getElementById('fisicoLibList');
   if(FISICO_TABLES.length === 0){ el.innerHTML = '<div class="lib-empty-msg">Sin tablas todavía. Añade la primera abajo.</div>'; return; }
-  el.innerHTML = FISICO_TABLES.map((t, idx) => {
+  const q = fisicoSearchQuery.trim().toLowerCase();
+  const visible = FISICO_TABLES
+    .map((t, idx) => ({ t, idx }))
+    .filter(x => matchesFisicoSearch(x.t, q));
+  if(visible.length === 0){ el.innerHTML = `<div class="lib-empty-msg">Ninguna tabla coincide con "${fisicoSearchQuery}".</div>`; return; }
+  el.innerHTML = visible.map(({t, idx}) => {
     const isOpen = expandedFisicoId === t.id;
     return `
     <div class="lib-row">
@@ -1354,6 +1508,10 @@ function renderFisicoLib(){
     ${isOpen ? exercisesPanelHTML(t) : ''}`;
   }).join('');
 }
+document.getElementById('fisicoSearch').addEventListener('input', function(){
+  fisicoSearchQuery = this.value;
+  renderFisicoLib();
+});
 async function toggleFisicoTeam(tableId, teamId, checked){
   const t = findFisicoTable(tableId);
   let ids = t.teamIds.slice();
@@ -1418,7 +1576,7 @@ async function moveFisico(idx, dir){
 }
 async function deleteFisico(tableId){
   const t = findFisicoTable(tableId);
-  if(!confirm(`¿Eliminar "${t.name}"? Se quitará también de cualquier día que la tenga asignada.`)) return;
+  if(!(await customConfirm(`¿Eliminar "${t.name}"? Se quitará también de cualquier día que la tenga asignada.`, 'Eliminar'))) return;
   await sb.from('fisico_tables').delete().eq('id', tableId);
   await loadLibraries(); renderFisicoLib(); await refreshCurrentWeek(); render();
 }
@@ -1456,7 +1614,7 @@ async function moveExercise(tableId, idx, dir){
 async function deleteExercise(tableId, exerciseId){
   const t = findFisicoTable(tableId);
   const ex = t.exercises.find(e => e.id === exerciseId);
-  if(!confirm(`¿Eliminar el ejercicio "${ex.name}"?`)) return;
+  if(!(await customConfirm(`¿Eliminar el ejercicio "${ex.name}"?`, 'Eliminar'))) return;
   await sb.from('fisico_exercises').delete().eq('id', exerciseId);
   await loadLibraries(); renderFisicoLib();
 }
@@ -1492,10 +1650,32 @@ function openFisicoModal(tableId){
 }
 function closeExerciseModal(){ document.getElementById('exerciseModal').style.display = 'none'; }
 
+// ---- Confirmación bonita (sustituye a window.confirm) ----
+let _confirmResolve = null;
+function customConfirm(message, confirmLabel){
+  return new Promise((resolve) => {
+    _confirmResolve = resolve;
+    document.getElementById('confirmMessage').textContent = message;
+    document.getElementById('confirmOkBtn').textContent = confirmLabel || 'Confirmar';
+    document.getElementById('confirmModal').style.display = 'flex';
+  });
+}
+function _resolveConfirm(result){
+  document.getElementById('confirmModal').style.display = 'none';
+  if(_confirmResolve){ _confirmResolve(result); _confirmResolve = null; }
+}
+document.getElementById('confirmCancelBtn').addEventListener('click', () => _resolveConfirm(false));
+document.getElementById('confirmOkBtn').addEventListener('click', () => _resolveConfirm(true));
+
 function renderErgoLib(){
   const el = document.getElementById('ergoLibList');
   if(ERGO_TABLES.length === 0){ el.innerHTML = '<div class="lib-empty-msg">Sin entrenos todavía. Añade el primero abajo.</div>'; return; }
-  el.innerHTML = ERGO_TABLES.map((t, idx) => `
+  const q = ergoSearchQuery.trim().toLowerCase();
+  const visible = ERGO_TABLES
+    .map((t, idx) => ({ t, idx }))
+    .filter(x => matchesErgoSearch(x.t, q));
+  if(visible.length === 0){ el.innerHTML = `<div class="lib-empty-msg">Ningún entreno coincide con "${ergoSearchQuery}".</div>`; return; }
+  el.innerHTML = visible.map(({t, idx}) => `
     <div class="lib-row" style="flex-direction:column;align-items:stretch;">
       <div class="lib-row-main" style="display:flex;flex-direction:column;gap:6px;">
         <input class="lib-row-name" value="${t.name}" placeholder="Título" onchange="renameErgo('${t.id}', this.value)">
@@ -1512,6 +1692,10 @@ function renderErgoLib(){
       </div>
     </div>`).join('');
 }
+document.getElementById('ergoSearch').addEventListener('input', function(){
+  ergoSearchQuery = this.value;
+  renderErgoLib();
+});
 async function toggleErgoTeam(tableId, teamId, checked){
   const t = ERGO_TABLES.find(t => t.id === tableId);
   let ids = t.teamIds.slice();
@@ -1542,7 +1726,7 @@ async function moveErgo(idx, dir){
 }
 async function deleteErgo(id){
   const t = ERGO_TABLES.find(t => t.id === id);
-  if(!confirm(`¿Eliminar "${t.name}"? Se quitará también de cualquier día que lo tenga asignado.`)) return;
+  if(!(await customConfirm(`¿Eliminar "${t.name}"? Se quitará también de cualquier día que lo tenga asignado.`, 'Eliminar'))) return;
   await sb.from('ergo_tables').delete().eq('id', id);
   await loadLibraries(); renderErgoLib(); await refreshCurrentWeek(); render();
 }
@@ -1568,6 +1752,11 @@ document.getElementById('ergoAddBtn').addEventListener('click', async () => {
 // ============================================================================
 // CALENDARIO DE REGATAS
 // ============================================================================
+// Lista fija de categorías, para que no acaben apareciendo variantes sueltas
+// como "Abs" / "Absolutos" / "ABS" mezcladas sin querer.
+const FIXED_REGATTA_CATEGORIES = ['Ale', 'Inf', 'Cad', 'Juv', 'Abs', 'Vet'];
+const ALL_CATEGORIES_LABEL = 'Totes les categories';
+
 function renderRegatas(){
   const wrap = document.getElementById('regatasGroups');
   const isEditor = userRole === 'editor';
@@ -1579,7 +1768,10 @@ function renderRegatas(){
   wrap.innerHTML = REGATAS.map(group => {
     const rows = group.races.map(r => {
       if(isEditor){
-        const catsStr = (r.cats || []).join(', ');
+        const catChecks = FIXED_REGATTA_CATEGORIES.map(c =>
+          `<label class="cat-check"><input type="checkbox" ${r.cats.includes(c) ? 'checked' : ''} onchange="toggleRegattaCategory('${r.id}', '${c}', this.checked)"> ${c}</label>`
+        ).join('');
+        const allCheck = `<label class="cat-check cat-check-all"><input type="checkbox" ${r.cats.includes(ALL_CATEGORIES_LABEL) ? 'checked' : ''} onchange="toggleRegattaAllCategories('${r.id}', this.checked)"> Todas</label>`;
         return `<div class="regata-row editing">
           <div class="regata-edit-line">
             <input type="date" name="race_date" value="${r.raceDate}" onchange="updateRegattaField('${r.id}', 'race_date', this.value)">
@@ -1588,9 +1780,9 @@ function renderRegatas(){
           </div>
           <div class="regata-edit-line">
             <input type="text" name="location" value="${r.lloc || ''}" placeholder="Lloc (vacío = Per confirmar)" onchange="updateRegattaField('${r.id}', 'location', this.value)">
-            <input type="text" name="categories" value="${catsStr}" placeholder="Categorías separadas por coma (Inf, Cad, Juv, Abs...)" onchange="updateRegattaField('${r.id}', 'categories', this.value)">
             <label class="highlight-toggle"><input type="checkbox" ${r.highlight ? 'checked' : ''} onchange="updateRegattaField('${r.id}', 'highlight', this.checked)"> Destacar</label>
           </div>
+          <div class="regata-cat-checks">${catChecks}${allCheck}</div>
         </div>`;
       }
       const catsHtml = r.cats.map(c => `<span class="regata-cat">${c}</span>`).join('');
@@ -1611,9 +1803,7 @@ function renderRegatas(){
 
 async function updateRegattaField(raceId, field, value){
   let payload = {};
-  if(field === 'categories'){
-    payload.categories = value.split(',').map(c => c.trim()).filter(Boolean);
-  } else if(field === 'location'){
+  if(field === 'location'){
     payload.location = value.trim() ? value.trim() : null;
   } else if(field === 'highlight'){
     payload.highlight = value;
@@ -1621,6 +1811,27 @@ async function updateRegattaField(raceId, field, value){
     payload[field] = value;
   }
   await sb.from('regattas').update(payload).eq('id', raceId);
+  await loadRegattas(); renderRegatas();
+}
+
+function findRegattaById(raceId){
+  for(const g of REGATAS){
+    const found = g.races.find(r => r.id === raceId);
+    if(found) return found;
+  }
+  return null;
+}
+async function toggleRegattaCategory(raceId, catCode, checked){
+  const r = findRegattaById(raceId);
+  if(!r) return;
+  let cats = (r.cats || []).filter(c => c !== ALL_CATEGORIES_LABEL);
+  if(checked){ if(!cats.includes(catCode)) cats.push(catCode); }
+  else { cats = cats.filter(c => c !== catCode); }
+  await sb.from('regattas').update({ categories: cats }).eq('id', raceId);
+  await loadRegattas(); renderRegatas();
+}
+async function toggleRegattaAllCategories(raceId, checked){
+  await sb.from('regattas').update({ categories: checked ? [ALL_CATEGORIES_LABEL] : [] }).eq('id', raceId);
   await loadRegattas(); renderRegatas();
 }
 
@@ -1640,7 +1851,7 @@ async function addRegatta(groupName){
 }
 
 async function deleteRegatta(raceId){
-  if(!confirm('¿Eliminar esta regata del calendario?')) return;
+  if(!(await customConfirm('¿Eliminar esta regata del calendario?', 'Eliminar'))) return;
   await sb.from('regattas').delete().eq('id', raceId);
   await loadRegattas(); renderRegatas();
 }
