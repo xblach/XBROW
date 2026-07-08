@@ -24,7 +24,7 @@
     --teal:#3E6E73;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  html,body{margin:0;padding:0;overflow-x:hidden;}
   body{
     background:var(--ink);
     color:var(--off);
@@ -625,7 +625,7 @@
     </div>
     <button class="week-nav-btn" id="nextBtn">›</button>
   </div>
-  <div style="display:flex;justify-content:center;gap:10px;margin-top:12px;">
+  <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:12px;">
     <button class="edit-toggle-btn" id="editToggleBtn">✎ Editar semana</button>
     <button class="edit-toggle-btn" id="exportPdfBtn">⭳ Exportar PDF</button>
   </div>
