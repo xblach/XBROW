@@ -664,8 +664,10 @@
   </nav>
   <div class="sub-teams" id="subTeams">
     <button class="sub-tab" data-slug="escola">Escola</button>
-    <button class="sub-tab active" data-slug="absolutos">Absolutos/as</button>
-    <button class="sub-tab" data-slug="veteranos">Veteranos/as</button>
+    <button class="sub-tab active" data-slug="absoluto-masculino">Absoluto Masculino</button>
+    <button class="sub-tab" data-slug="absoluto-femenino">Absoluto Femenino</button>
+    <button class="sub-tab" data-slug="veterano-masculino">Veterano Masculino</button>
+    <button class="sub-tab" data-slug="veterano-femenino">Veterano Femenino</button>
   </div>
 
   <div class="week-bar">
@@ -673,7 +675,7 @@
     <div class="week-label">
       <div class="eyebrow" id="weekEyebrow">Semana actual</div>
       <h1 id="weekTitle">6 — 12 julio</h1>
-      <div class="week-tag" id="weekTag">Absolutos/as · Banco Fijo</div>
+      <div class="week-tag" id="weekTag">Absoluto Masculino · Banco Fijo</div>
     </div>
     <button class="week-nav-btn" id="nextBtn">›</button>
   </div>
@@ -715,7 +717,7 @@
 <section id="viewEditor" style="display:none;">
   <div class="regatas-head">
     <div>
-      <div class="eyebrow" style="color:var(--red);" id="editorEyebrow">Editor · Absolutos/as · Banco Fijo</div>
+      <div class="eyebrow" style="color:var(--red);" id="editorEyebrow">Editor · Absoluto Masculino · Banco Fijo</div>
       <h1 class="regatas-title" id="editorWeekTitle">6 — 12 julio</h1>
     </div>
     <div class="editor-actions">
@@ -1064,7 +1066,7 @@ async function refreshCurrentWeek(){
 async function onLoggedIn(){
   await loadTeamsAndCategories();
   await loadLibraries();
-  currentCategoryId = getCategoryId('banco-fijo', 'absolutos');
+  currentCategoryId = getCategoryId('banco-fijo', 'absoluto-masculino');
   currentTeamId = (TEAMS.find(t => t.slug === 'banco-fijo') || {}).id || null;
   await loadRegattas();
   currentMonday = thisMonday();
@@ -1927,7 +1929,7 @@ function currentLabel(){
 async function switchCategory(){
   const activeTeamBtn = document.querySelector('.team-tab.active');
   const teamSlug = activeTeamBtn.dataset.slug;
-  const subSlug = document.querySelector('.sub-tab.active')?.dataset.slug || 'absolutos';
+  const subSlug = document.querySelector('.sub-tab.active')?.dataset.slug || 'escola';
   currentCategoryId = getCategoryId(teamSlug, subSlug);
   const newTeamId = (TEAMS.find(t => t.slug === teamSlug) || {}).id || null;
   const teamChanged = newTeamId !== currentTeamId;
